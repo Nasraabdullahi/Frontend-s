@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <title>Skrøbelige Pakker Dashboard</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <link rel="stylesheet" href="./css/styles.css">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-light">
+  <div id="app" class="container my-5">
+    <!-- Header -->
+    <div class="text-center mb-5">
+      <h1 class="display-4 text-primary">📦 Skrøbelige Pakker</h1>
+      <p class="lead text-muted">Overblik over pakker, tilt og vejr</p>
+    </div>
+
+    <!-- Dashboard badges -->
+    <div class="row mb-4 text-center">
+      <div class="col-md-6 mb-3">
+        <div class="card shadow-sm border-0">
+          <div class="card-body">
+            <h5 class="card-title">Antal pakker</h5>
+            <span class="badge badge-pill badge-primary p-3">{{ packages.length }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 mb-3">
+        <div class="card shadow-sm border-0">
+          <div class="card-body">
+            <h5 class="card-title">Skrøbelige pakker</h5>
+            <span class="badge badge-pill badge-danger p-3">{{ fragileCount }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Søgning -->
+    <div class="input-group mb-4">
+      <input v-model="search" class="form-control" placeholder="🔍 Søg efter pakke...">
+      <div class="input-group-append">
+        <button class="btn btn-outline-secondary" @click="refreshAll">Opdater</button>
+      </div>
+    </div>
+
+    <!-- Pakker -->
+    <div v-for="pkg in filteredPackages" :key="pkg.id" class="card mb-4 shadow-sm border-0">
+      <div class="card-body">
+        <h4 class="card-title text-info">Pakke #{{ pkg.id }}</h4>
+        <p class="mb-2">{{ pkg.description || 'Ingen beskrivelse' }}</p>
+
+        <div class="mb-3">
+          <span class="badge mr-2" :class="pkg.erSkrøbelig ? 'badge-danger' : 'badge-success'">
+            {{ pkg.erSkrøbelig ? 'Skrøbelig' : 'Robust' }}
+          </span>
+          <span v-if="pkg.limitProfile?.name" class="badge badge-info">Profil: {{ pkg.limitProfile.name }}</span>
+        </div>
+
+        <!-- Tilt -->
+        <p>
+          <strong>Seneste tilt:</strong>
+          <span :class="tiltClass(pkg)">{{ displayTilt(pkg.latestTilt) }}</span>
+        </p>
+        <p class="text-muted" v-if="hasTiltLimit(pkg)">
+          Grænse: {{ pkg.limitProfile.maxTiltDegrees }}°
+          <span v-if="pkg.latestTilt > pkg.limitProfile.maxTiltDegrees" class="text-danger ml-2">⚠️ Overskred</span>
+        </p>
+
+        <!-- Sensor events -->
+        <button class="btn btn-sm btn-outline-primary mb-2" @click="loadEvents(pkg.id)">Vis sensorhændelser</button>
+        <ul v-if="events[pkg.id]?.length" class="list-group mt-2">
+          <li v-for="ev in events[pkg.id]" :key="ev.id" class="list-group-item">
+            {{ formatTimestamp(ev.timestamp) }} — Tilt: {{ ev.tilt }}°
+          </li>
+        </ul>
+        <div v-else-if="events[pkg.id]" class="text-muted mt-2">Ingen hændelser for denne pakke.</div>
+      </div>
+    </div>
+
+    <!-- Samlet vejrudsigt (DMI) -->
+    <div class="card mt-4 shadow-sm border-0">
+      <div class="card-body">
+        <h5 class="card-title text-success">🌦 Vejrudsigt</h5>
+        
+        <!-- Tabel -->
+        <table class="table table-striped mb-4">
+          <thead>
+            <tr>
+              <th>Dag</th>
+              <th>Temperatur</th>
+              <th>Vind</th>
+              <th>Forhold</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Mandag</td>
+              <td>12°C</td>
+              <td>5 m/s</td>
+              <td>Sol og let skyer</td>
+            </tr>
+            <tr>
+              <td>Tirsdag</td>
+              <td>9°C</td>
+              <td>7 m/s</td>
+              <td>Regn og blæst</td>
+            </tr>
+            <tr>
+              <td>Onsdag</td>
+              <td>14°C</td>
+              <td>3 m/s</td>
+              <td>Klar sol</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- DMI iframe -->
+        <iframe 
+          src="https://www.dmi.dk/lokation/show/DK/2618425/København/" 
+          width="100%" 
+          height="600" 
+          style="border:none; border-radius:8px;">
+        </iframe>
+      </div>
+    </div>
+  </div>
+
+  <script src="./js/main.js"></script>
+</body>
+</html>
+
+
+<!-- OutputType: DLL -->
+<OutputType>Library</OutputType>
+<TargetFramework>net9.0</TargetFramework>
+<ImplicitUsings>enable</ImplicitUsings>
+<Nullable>enable</Nullable>
+
+<!-- XML-dokumentation -->
+<GenerateDocumentationFile>true</GenerateDocumentationFile>
+<DocumentationFile>$(OutputPath)SkrøbelighedsPakkeLib.xml</DocumentationFile>
+</PropertyGroup>
