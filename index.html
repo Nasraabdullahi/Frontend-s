@@ -5,6 +5,7 @@
   <title>Skrøbelige Pakker Dashboard</title>
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <link rel="stylesheet" href="./css/styles.css">
+  <!-- Vue og Axios -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
@@ -51,13 +52,12 @@
         <p class="mb-2">{{ pkg.description || 'Ingen beskrivelse' }}</p>
 
         <div class="mb-3">
-          <span class="badge mr-2" :class="pkg.erSkrøbelig ? 'badge-danger' : 'badge-success'">
-            {{ pkg.erSkrøbelig ? 'Skrøbelig' : 'Robust' }}
+          <span class="badge mr-2" :class="pkg.latestTilt > 10 ? 'badge-danger' : 'badge-success'">
+            {{ pkg.latestTilt > 10 ? 'Skrøbelig' : 'Robust' }}
           </span>
           <span v-if="pkg.limitProfile?.name" class="badge badge-info">Profil: {{ pkg.limitProfile.name }}</span>
         </div>
 
-        <!-- Tilt -->
         <p>
           <strong>Seneste tilt:</strong>
           <span :class="tiltClass(pkg)">{{ displayTilt(pkg.latestTilt) }}</span>
@@ -67,55 +67,35 @@
           <span v-if="pkg.latestTilt > pkg.limitProfile.maxTiltDegrees" class="text-danger ml-2">⚠️ Overskred</span>
         </p>
 
-        <!-- Sensor events -->
         <button class="btn btn-sm btn-outline-primary mb-2" @click="loadEvents(pkg.id)">Vis sensorhændelser</button>
-        <ul v-if="events[pkg.id]?.length" class="list-group mt-2">
-          <li v-for="ev in events[pkg.id]" :key="ev.id" class="list-group-item">
-            {{ formatTimestamp(ev.timestamp) }} — Tilt: {{ ev.tilt }}°
-          </li>
-        </ul>
-        <div v-else-if="events[pkg.id]" class="text-muted mt-2">Ingen hændelser for denne pakke.</div>
-      </div>
-    </div>
-
-    <!-- Samlet vejrudsigt (DMI) -->
-    <div class="card mt-4 shadow-sm border-0">
-      <div class="card-body">
-        <h5 class="card-title text-success">🌦 Vejrudsigt</h5>
-        
-        <!-- Tabel -->
-        <table class="table table-striped mb-4">
+        <table v-if="sensorEvents[pkg.id]?.length" class="table table-sm table-striped mt-2">
           <thead>
             <tr>
-              <th>Dag</th>
-              <th>Temperatur</th>
-              <th>Vind</th>
-              <th>Forhold</th>
+              <th>Tidspunkt</th>
+              <th>Tilt</th>
+              <th>Pitch</th>
+              <th>Roll</th>
+              <th>Yaw</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>Mandag</td>
-              <td>12°C</td>
-              <td>5 m/s</td>
-              <td>Sol og let skyer</td>
-            </tr>
-            <tr>
-              <td>Tirsdag</td>
-              <td>9°C</td>
-              <td>7 m/s</td>
-              <td>Regn og blæst</td>
-            </tr>
-            <tr>
-              <td>Onsdag</td>
-              <td>14°C</td>
-              <td>3 m/s</td>
-              <td>Klar sol</td>
+            <tr v-for="ev in sensorEvents[pkg.id]" :key="ev.id">
+              <td>{{ formatTimestamp(ev.timestamp) }}</td>
+              <td>{{ ev.tilt }}°</td>
+              <td>{{ ev.pitch }}</td>
+              <td>{{ ev.roll }}</td>
+              <td>{{ ev.yaw }}</td>
             </tr>
           </tbody>
         </table>
+        <div v-else-if="sensorEvents[pkg.id]" class="text-muted mt-2">Ingen hændelser for denne pakke.</div>
+      </div>
+    </div>
 
-        <!-- DMI iframe -->
+    <!-- Samlet vejrudsigt -->
+    <div class="card mt-4 shadow-sm border-0">
+      <div class="card-body">
+        <h5 class="card-title text-success">🌦 Vejrudsigt</h5>
         <iframe 
           src="https://www.dmi.dk/lokation/show/DK/2618425/København/" 
           width="100%" 
@@ -126,18 +106,7 @@
     </div>
   </div>
 
+  <!-- Din Vue app -->
   <script src="./js/main.js"></script>
 </body>
 </html>
-
-
-<!-- OutputType: DLL -->
-<OutputType>Library</OutputType>
-<TargetFramework>net9.0</TargetFramework>
-<ImplicitUsings>enable</ImplicitUsings>
-<Nullable>enable</Nullable>
-
-<!-- XML-dokumentation -->
-<GenerateDocumentationFile>true</GenerateDocumentationFile>
-<DocumentationFile>$(OutputPath)SkrøbelighedsPakkeLib.xml</DocumentationFile>
-</PropertyGroup>
