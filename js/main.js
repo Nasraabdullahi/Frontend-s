@@ -3,23 +3,26 @@ const { createApp } = Vue;
 createApp({
   data() {
     return {
-      packages: [],       // pakker fra API
-      sensorEvents: {},   // events pr. pakke
-      limitProfiles: {},  // evt. limit profiles
-      weather: {},        // tredjeparts vejrdata
-      search: ""          // søgefelt til filter
+      packages: [],
+      sensorEvents: {},
+      limitProfiles: [],
+      weather: {},
+      search: ""
     };
   },
   mounted() {
-    this.fetchPackages();
+    // Hent pakker og profiler, og hent derefter vejrdata for alle pakker
+    this.fetchPackages().then(() => {
+      this.packages.forEach(pkg => this.loadWeather(pkg.id));
+    });
     this.fetchLimitProfiles();
   },
   computed: {
     filteredPackages() {
       if (!this.search) return this.packages;
       return this.packages.filter(p =>
-        p.Description?.toLowerCase().includes(this.search.toLowerCase()) ||
-        p.Id.toString().includes(this.search)
+        p.description?.toLowerCase().includes(this.search.toLowerCase()) ||
+        p.id.toString().includes(this.search)
       );
     },
     fragileCount() {
@@ -29,11 +32,12 @@ createApp({
   methods: {
     async fetchPackages() {
       try {
-        const res = await axios.get("http://localhost:5187/api/Package");
+        const res = await axios.get("http://localhost:5187/api/package");
         this.packages = res.data.map(p => ({
-          id: p.Id,
-          description: p.Description,
-          Tilt: 0,
+          id: p.id ?? p.Id,
+          description: p.description ?? p.Description,
+          limitProfileId: p.limitProfileId ?? p.LimitProfileId,
+          latestTilt: null,
           limitProfile: null
         }));
       } catch (err) {
@@ -42,20 +46,19 @@ createApp({
     },
     async loadEvents(packageId) {
       try {
-        const res = await axios.get(`http://localhost:5187/api/SensorEvent/package/${packageId}`);
+        const res = await axios.get(`http://localhost:5187/api/sensorevent/package/${packageId}`);
         this.sensorEvents[packageId] = res.data.map(ev => ({
-          id: ev.id,
-          tilt: ev.tilt,
-          pitch: ev.pitch,
-          roll: ev.roll,
-          yaw: ev.yaw,
-          timestamp: ev.timestamp
+          id: ev.id ?? ev.Id,
+          tilt: ev.tilt ?? ev.Tilt,
+          timestamp: ev.timestamp ?? ev.Timestamp
         }));
         if (this.sensorEvents[packageId].length > 0) {
           const latestEvent = this.sensorEvents[packageId].at(-1);
           const pkg = this.packages.find(p => p.id === packageId);
           if (pkg) pkg.latestTilt = latestEvent.tilt;
         }
+        // Hent vejrdata samtidig
+        this.loadWeather(packageId);
       } catch (err) {
         console.error("Fejl ved hentning af events:", err);
       }
@@ -63,22 +66,34 @@ createApp({
     async fetchLimitProfiles() {
       try {
         const res = await axios.get("http://localhost:5187/api/limitprofile");
-        this.limitProfiles = res.data;
+        this.limitProfiles = res.data.map(lp => ({
+          id: lp.id ?? lp.Id,
+          name: lp.name ?? lp.Name,
+          maxTiltDegrees: lp.maxTiltDegrees ?? lp.MaxTiltDegrees
+        }));
+        // Bind profiler til pakker
+        this.packages.forEach(pkg => {
+          pkg.limitProfile = this.limitProfiles.find(lp => lp.id === pkg.limitProfileId);
+        });
       } catch (err) {
         console.error("Fejl ved hentning af limit profiles:", err);
       }
     },
     async loadWeather(packageId) {
       try {
-        const apiKey = "DIN_API_KEY"; // indsæt din OpenWeatherMap nøgle
-        const city = "Copenhagen";
+        const apiKey = "b4556485fb0e655b60b4d4de7a5de145"; // din rigtige nøgle
+        const cityId = 2618425; // København
+
         const res = await axios.get(
-          `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${apiKey}`
+          `https://api.openweathermap.org/data/2.5/weather?id=${cityId}&units=metric&appid=${apiKey}`
         );
+
+        // VIGTIGT: brug 'weather', ikke 'loadweather'
         this.weather[packageId] = {
           temp: res.data.main.temp,
           description: res.data.weather[0].description,
-          wind: res.data.wind.speed
+          wind: res.data.wind.speed,
+          icon: res.data.weather[0].icon
         };
       } catch (err) {
         console.error("Fejl ved hentning af vejr:", err);
@@ -98,14 +113,12 @@ createApp({
       return pkg.limitProfile?.maxTiltDegrees !== undefined;
     },
     refreshAll() {
-      this.fetchPackages();
+      this.fetchPackages().then(() => {
+        this.packages.forEach(pkg => this.loadEvents(pkg.id));
+        this.packages.forEach(pkg => this.loadWeather(pkg.id));
+      });
       this.fetchLimitProfiles();
     }
   }
 }).mount("#app");
-
-// Testkald til API
-axios.get("http://localhost:5187/api/package")
-  .then(res => console.log("API test response:", res.data))
-  .catch(err => console.error("API test fejl:", err));
 
